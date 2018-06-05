@@ -687,6 +687,7 @@ static NSString *kEventCellIdentifier = @"EventCell";
     NSTextField *_title;
     NSTextField *_location;
     NSTextField *_duration;
+    NSTextField *_recurrence;
 }
 
 - (instancetype)init
@@ -707,17 +708,29 @@ static NSString *kEventCellIdentifier = @"EventCell";
         _title = label(12, NSFontWeightMedium);
         _location = label(11, NSFontWeightRegular);
         _duration = label(11, NSFontWeightRegular);
+        _recurrence = label(11, NSFontWeightRegular);
         _btnDelete = [MoButton new];
         _btnDelete.image = [NSImage imageNamed:@"btnDel"];
+        // The empty cell at the bottom is needed because of a bug in NSGridView.
+        // Sometimes the bottom (recurrence) row is hidden. When this happens, the
+        // centering yPlacement of _btnDelete breaks. To fix, we have an empty
+        // bottom row that can never be hidden. It has no content nor top padding,
+        // so it takes no space, but is only there to anchor the vertical
+        // centering constraint for _btnDelete.
         _grid = [NSGridView gridViewWithViews:@[@[_title, _btnDelete],
                                                 @[_location],
-                                                @[_duration]]];
+                                                @[_duration],
+                                                @[_recurrence],
+                                                @[NSGridCell.emptyContentView]]];
         _grid.translatesAutoresizingMaskIntoConstraints = NO;
-        _grid.rowSpacing = 5;
+        _grid.rowSpacing = 0;
         _grid.columnSpacing = 5;
-        [[_grid cellForView:_btnDelete].column mergeCellsInRange:NSMakeRange(0, 3)];
+        [_grid rowAtIndex:1].topPadding = 5; // location
+        [_grid rowAtIndex:2].topPadding = 5; // duration
+        [_grid rowAtIndex:3].topPadding = 5; // recurrence
+        [[_grid cellForView:_btnDelete].column mergeCellsInRange:NSMakeRange(0, 5)];
         [_grid cellForView:_btnDelete].yPlacement = NSGridCellPlacementCenter;
-        [_grid columnAtIndex:0].width = 180;
+        [_grid columnAtIndex:0].width = _title.preferredMaxLayoutWidth;
     }
     return self;
 }
@@ -744,6 +757,7 @@ static NSString *kEventCellIdentifier = @"EventCell";
     NSString *title = @"";
     NSString *location = @"";
     NSString *duration = @"";
+    NSString *recurrence = @"";
     intervalFormatter.timeZone  = [NSTimeZone localTimeZone];
     
     if (info && info.event) {
@@ -753,6 +767,9 @@ static NSString *kEventCellIdentifier = @"EventCell";
     
     // Hide location row IF there's no location string.
     [_grid rowAtIndex:1].hidden = location.length == 0;
+    
+    // Hide recurrence row IF there's no recurrence rule;
+    [_grid rowAtIndex:3].hidden = !info.event.hasRecurrenceRules;
     
     // Hide delete button if event doesn't allow modification.
     [_grid columnAtIndex:1].hidden = !info.event.calendar.allowsContentModifications;
@@ -782,13 +799,57 @@ static NSString *kEventCellIdentifier = @"EventCell";
             duration = [duration stringByReplacingOccurrencesOfString:@"– " withString:@"–\n"];
         }
     }
+    // Recurrence.
+    if (info.event.hasRecurrenceRules) {
+        recurrence = [NSString stringWithFormat:@"%@ ", NSLocalizedString(@"Repeat:", nil)];
+        EKRecurrenceRule *rule = info.event.recurrenceRules.firstObject;
+        NSString *frequency = @"✓";
+        switch (rule.frequency) {
+            case EKRecurrenceFrequencyDaily:
+                frequency = rule.interval == 1
+                    ? NSLocalizedString(@"Every Day", nil)
+                    : [NSString stringWithFormat:NSLocalizedString(@"Every %zd Days", nil), rule.interval];
+                break;
+            case EKRecurrenceFrequencyWeekly:
+                frequency = rule.interval == 1
+                    ? NSLocalizedString(@"Every Week", nil)
+                    : [NSString stringWithFormat:NSLocalizedString(@"Every %zd Weeks", nil), rule.interval];
+                break;
+            case EKRecurrenceFrequencyMonthly:
+                frequency = rule.interval == 1
+                    ? NSLocalizedString(@"Every Month", nil)
+                    : [NSString stringWithFormat:NSLocalizedString(@"Every %zd Months", nil), rule.interval];
+                break;
+            case EKRecurrenceFrequencyYearly:
+                frequency = rule.interval == 1
+                    ? NSLocalizedString(@"Every Year", nil)
+                    : [NSString stringWithFormat:NSLocalizedString(@"Every %zd Years", nil), rule.interval];
+                break;
+            default:
+                break;
+        }
+        recurrence = [recurrence stringByAppendingString:frequency];
+        if (rule.recurrenceEnd) {
+            if (rule.recurrenceEnd.endDate) {
+                intervalFormatter.timeStyle = NSDateIntervalFormatterNoStyle;
+                NSString *endRecurrence = [NSString stringWithFormat:@"\n%@ %@", NSLocalizedString(@"End Repeat:", nil), [intervalFormatter stringFromDate:rule.recurrenceEnd.endDate toDate:rule.recurrenceEnd.endDate]];
+                recurrence = [recurrence stringByAppendingString:endRecurrence];
+            }
+            if (rule.recurrenceEnd.occurrenceCount) {
+                NSString *endRecurrence = [NSString stringWithFormat:@"\n%@ ×%zd", NSLocalizedString(@"End Repeat:", nil), rule.recurrenceEnd.occurrenceCount];
+                recurrence = [recurrence stringByAppendingString:endRecurrence];
+            }
+        }
+    }
     _title.stringValue = title;
     _location.stringValue = location;
     _duration.stringValue = duration;
+    _recurrence.stringValue = recurrence;
     
     _title.textColor = [[Themer shared] agendaEventTextColor];
     _location.textColor = [[Themer shared] agendaEventTextColor];
     _duration.textColor = [[Themer shared] agendaEventTextColor];
+    _recurrence.textColor = [[Themer shared] agendaEventTextColor];
 }
 
 - (NSSize)size
@@ -797,8 +858,9 @@ static NSString *kEventCellIdentifier = @"EventCell";
     // plus the height of the top and bottom marigns.
     // top margin + bottom margin = 8 + 8 = 16, rowSpace = 5
     CGFloat locationHeight = [_grid rowAtIndex:1].isHidden ? 0 : _location.intrinsicContentSize.height + 5;
+    CGFloat repeatsHeight = [_grid rowAtIndex:3].isHidden ? 0 : _recurrence.intrinsicContentSize.height + 5;
     CGFloat btnDeleteWidth = [_grid columnAtIndex:1].isHidden ? 0 : _btnDelete.fittingSize.width + 5;
-    CGFloat height = _title.intrinsicContentSize.height + locationHeight + _duration.intrinsicContentSize.height + 5 + 16;
+    CGFloat height = _title.intrinsicContentSize.height + locationHeight + _duration.intrinsicContentSize.height + 5 + repeatsHeight + 16;
     
     return NSMakeSize(POPOVER_WIDTH + btnDeleteWidth, height);
 }
