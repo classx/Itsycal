@@ -300,8 +300,6 @@ static NSString *kEventCellIdentifier = @"EventCell";
         if (!info.isStartDate && !info.isAllDay &&
             [self.nsCal isDateInToday:info.event.endDate] &&
             [NSDate.date compare:info.event.endDate] == NSOrderedDescending) {
-            // This looks pointless, but I'm clearing the attributes so the
-            // next line where I set textColor will color the whole string.
             cell.titleTextField.textColor = [[Themer shared] agendaEventDateTextColor];
             cell.dim = YES;
         }
