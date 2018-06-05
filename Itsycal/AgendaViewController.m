@@ -44,6 +44,7 @@ static NSString *kEventCellIdentifier = @"EventCell";
 @interface AgendaPopoverVC : NSViewController
 - (void)populateWithEventInfo:(EventInfo *)info;
 - (NSSize)size;
+@property (nonatomic) MoButton *btnDelete;
 @end
 
 #pragma mark -
@@ -229,7 +230,6 @@ static NSString *kEventCellIdentifier = @"EventCell";
 
 - (void)showPopover:(id)sender
 {
-    NSLog(@"%s", __FUNCTION__);
     if (_tv.hoverRow == -1 || [self tableView:_tv isGroupRow:_tv.hoverRow]) return;
     
     AgendaEventCell *cell = [_tv viewAtColumn:0 row:_tv.hoverRow makeIfNecessary:NO];
@@ -238,6 +238,13 @@ static NSString *kEventCellIdentifier = @"EventCell";
     
     AgendaPopoverVC *popoverVC = (AgendaPopoverVC *)_popover.contentViewController;
     [popoverVC populateWithEventInfo:cell.eventInfo];
+    
+    if (cell.eventInfo.event.calendar.allowsContentModifications) {
+        popoverVC.btnDelete.tag = _tv.hoverRow;
+        popoverVC.btnDelete.target = self;
+        popoverVC.btnDelete.action = @selector(btnDeleteClicked:);
+    }
+    
     [_popover setContentSize:popoverVC.size];
     [_popover showRelativeToRect:[_tv rectOfRow:_tv.hoverRow] ofView:_tv preferredEdge:NSRectEdgeMaxX];
 
@@ -360,6 +367,17 @@ static NSString *kEventCellIdentifier = @"EventCell";
         return;
     }
     [self showPopover:nil];
+}
+
+#pragma mark -
+#pragma mark Delete event
+
+- (void)btnDeleteClicked:(MoButton *)btn
+{
+    if (self.delegate && [self.delegate respondsToSelector:@selector(agendaWantsToDeleteEvent:)]) {
+        EventInfo *info = self.events[btn.tag];
+        [self.delegate agendaWantsToDeleteEvent:info.event];
+    }
 }
 
 #pragma mark -
@@ -669,7 +687,6 @@ static NSString *kEventCellIdentifier = @"EventCell";
     NSTextField *_title;
     NSTextField *_location;
     NSTextField *_duration;
-    MoButton *_btnDelete;
 }
 
 - (instancetype)init
@@ -737,7 +754,8 @@ static NSString *kEventCellIdentifier = @"EventCell";
     // Hide location row IF there's no location string.
     [_grid rowAtIndex:1].hidden = location.length == 0;
     
-    [_grid columnAtIndex:1].hidden = [title hasPrefix:@"foo"];
+    // Hide delete button if event doesn't allow modification.
+    [_grid columnAtIndex:1].hidden = !info.event.calendar.allowsContentModifications;
     
     // All-day events don't show time.
     intervalFormatter.timeStyle = info.event.isAllDay
