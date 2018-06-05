@@ -13,6 +13,7 @@
 @protocol MoTableViewDelegate <NSTableViewDelegate>
 
 - (void)tableView:(nonnull MoTableView *)tableView didHoverOverRow:(NSInteger)row;
+- (void)tableView:(nonnull MoTableView *)tableView didClickHoverRow:(NSInteger)row;
 
 @end
 

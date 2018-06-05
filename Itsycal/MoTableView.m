@@ -48,6 +48,11 @@
     [self removeTrackingArea:_trackingArea];
 }
 
+- (BOOL)validateProposedFirstResponder:(NSResponder *)responder forEvent:(NSEvent *)event
+{
+    return NO;
+}
+
 #pragma mark -
 #pragma mark Instance methods
 
@@ -75,6 +80,16 @@
 
 #pragma mark -
 #pragma mark NSTrackingArea
+
+- (void)mouseDown:(NSEvent *)event
+{
+    [super mouseDown:event];
+    if (self.hoverRow != -1) {
+        if ([self.delegate respondsToSelector:@selector(tableView:didClickHoverRow:)]) {
+            [self.delegate tableView:self didClickHoverRow:_hoverRow];
+        }
+    }
+}
 
 - (void)mouseEntered:(NSEvent *)theEvent
 {
