@@ -71,6 +71,8 @@ static NSString *kEventCellIdentifier = @"EventCell";
 
     // Calendars table view
     _tv = [MoTableView new];
+    _tv.target = self;
+    _tv.doubleAction = @selector(showPopover:);
     _tv.menu = contextMenu;
     _tv.headerView = nil;
     _tv.allowsColumnResizing = NO;
@@ -230,9 +232,9 @@ static NSString *kEventCellIdentifier = @"EventCell";
 
 - (void)showPopover:(id)sender
 {
-    if (_tv.hoverRow == -1 || [self tableView:_tv isGroupRow:_tv.hoverRow]) return;
+    if (_tv.clickedRow == -1 || [self tableView:_tv isGroupRow:_tv.clickedRow]) return;
     
-    AgendaEventCell *cell = [_tv viewAtColumn:0 row:_tv.hoverRow makeIfNecessary:NO];
+    AgendaEventCell *cell = [_tv viewAtColumn:0 row:_tv.clickedRow makeIfNecessary:NO];
     
     if (!cell) return; // should never happen
     
@@ -240,13 +242,13 @@ static NSString *kEventCellIdentifier = @"EventCell";
     [popoverVC populateWithEventInfo:cell.eventInfo];
     
     if (cell.eventInfo.event.calendar.allowsContentModifications) {
-        popoverVC.btnDelete.tag = _tv.hoverRow;
+        popoverVC.btnDelete.tag = _tv.clickedRow;
         popoverVC.btnDelete.target = self;
         popoverVC.btnDelete.action = @selector(btnDeleteClicked:);
     }
     
     [_popover setContentSize:popoverVC.size];
-    [_popover showRelativeToRect:[_tv rectOfRow:_tv.hoverRow] ofView:_tv preferredEdge:NSRectEdgeMinX];
+    [_popover showRelativeToRect:[_tv rectOfRow:_tv.clickedRow] ofView:_tv preferredEdge:NSRectEdgeMinX];
 
     // Hack to color entire popover background, including arrow.
     // stackoverflow.com/a/40186763/111418
@@ -357,14 +359,6 @@ static NSString *kEventCellIdentifier = @"EventCell";
     if (self.delegate && [self.delegate respondsToSelector:@selector(agendaHoveredOverRow:)]) {
         [self.delegate agendaHoveredOverRow:hoveredRow];
     }
-}
-
-- (void)tableView:(MoTableView *)tableView didClickHoverRow:(NSInteger)row
-{
-    if (row == -1 || [self tableView:_tv isGroupRow:row]) {
-        return;
-    }
-    [self showPopover:nil];
 }
 
 #pragma mark -
