@@ -246,7 +246,7 @@ static NSString *kEventCellIdentifier = @"EventCell";
     }
     
     [_popover setContentSize:popoverVC.size];
-    [_popover showRelativeToRect:[_tv rectOfRow:_tv.hoverRow] ofView:_tv preferredEdge:NSRectEdgeMaxX];
+    [_popover showRelativeToRect:[_tv rectOfRow:_tv.hoverRow] ofView:_tv preferredEdge:NSRectEdgeMinX];
 
     // Hack to color entire popover background, including arrow.
     // stackoverflow.com/a/40186763/111418
